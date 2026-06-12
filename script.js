@@ -282,6 +282,9 @@ let state = {
   timers: {},            // { stepId: { intervalId, remaining, total } }
 };
 
+const TIMER_RING_RADIUS = 70;
+const TIMER_RING_CIRCUMFERENCE = 2 * Math.PI * TIMER_RING_RADIUS;
+
 // Initialize step states
 STEPS.forEach(s => { state.stepStates[s.id] = 'locked'; });
 
@@ -531,10 +534,10 @@ function buildTimerSection(step) {
   const timer = state.timers[step.id];
   if (!timer) return '';
   const pct = ((timer.total - timer.remaining) / timer.total) * 100;
-  const circumference = 440;
-  const offset = circumference - (pct / 100) * circumference;
+  const offset = TIMER_RING_CIRCUMFERENCE - (pct / 100) * TIMER_RING_CIRCUMFERENCE;
 
-  const nextStep = STEPS[step.id];
+  const stepIndex = STEPS.findIndex(s => s.id === step.id);
+  const nextStep = stepIndex >= 0 ? STEPS[stepIndex + 1] : null;
 
   return `
     <div class="countdown-section" id="countdown-${step.id}">
@@ -549,7 +552,7 @@ function buildTimerSection(step) {
           </defs>
           <circle class="ring-bg" cx="80" cy="80" r="70"/>
           <circle class="ring-fill" cx="80" cy="80" r="70"
-            stroke-dasharray="${circumference}"
+            stroke-dasharray="${TIMER_RING_CIRCUMFERENCE}"
             stroke-dashoffset="${offset}"
             id="ring-${step.id}"/>
         </svg>
@@ -627,6 +630,7 @@ function startTimer(stepId) {
   state.timers[stepId] = {
     total: step.duration,
     remaining: step.duration,
+    intervalId: null,
   };
 
   renderMainPanel();
@@ -637,24 +641,33 @@ function startTimer(stepId) {
     if (!t) { clearInterval(intervalId); return; }
     t.remaining--;
 
+    let disp = document.getElementById(`timer-display-${stepId}`);
+    let mini = document.getElementById(`mini-${stepId}`);
+    let prog = document.getElementById(`prog-${stepId}`);
+    let ring = document.getElementById(`ring-${stepId}`);
+
+    if (!disp || !mini || !prog || !ring) {
+      renderMainPanel();
+      renderStepIndex();
+      disp = document.getElementById(`timer-display-${stepId}`);
+      mini = document.getElementById(`mini-${stepId}`);
+      prog = document.getElementById(`prog-${stepId}`);
+      ring = document.getElementById(`ring-${stepId}`);
+    }
+
     // Update timer display in main panel
-    const disp = document.getElementById(`timer-display-${stepId}`);
     if (disp) disp.textContent = formatTime(t.remaining);
 
     // Update mini countdown in sidebar
-    const mini = document.getElementById(`mini-${stepId}`);
     if (mini) mini.textContent = formatTime(t.remaining);
 
     // Update progress bar
     const pct = ((t.total - t.remaining) / t.total) * 100;
-    const prog = document.getElementById(`prog-${stepId}`);
     if (prog) prog.style.width = pct + '%';
 
     // Update SVG ring
-    const ring = document.getElementById(`ring-${stepId}`);
     if (ring) {
-      const circumference = 440;
-      const offset = circumference - (pct / 100) * circumference;
+      const offset = TIMER_RING_CIRCUMFERENCE - (pct / 100) * TIMER_RING_CIRCUMFERENCE;
       ring.setAttribute('stroke-dashoffset', offset);
     }
 
